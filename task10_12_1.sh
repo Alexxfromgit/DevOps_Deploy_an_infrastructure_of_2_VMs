@@ -22,13 +22,21 @@ ssh_authorized_keys:
 apt_update: true
 apt_sources:
 packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - iptables-persistent
 runcmd:
   - echo 1 > /proc/sys/net/ipv4/ip_forward
-  - iptables -A INPUT -i lo -j ACCEPT
-  - iptables -A FORWARD -i $VM1_EXTERNAL_IF -o $VM1_INTERNAL_IF -j ACCEPT
+  - iptables -A FORWARD -i $VM1_INTERNAL_IF -o $VM1_EXTERNAL_IF -j ACCEPT
+  - iptables -A FORWARD -i $VM1_EXTERNAL_IF -o $VM1_INTERNAL_IF -m state --state ESTABLISHED,RELATED -j ACCEPT
   - iptables -t nat -A POSTROUTING -o $VM1_EXTERNAL_IF -j MASQUERADE
-  - iptables -A FORWARD -i $VM1_EXTERNAL_IF -m state --state ESTABLISHED,RELATED -j ACCEPT
-  - iptables -A FORWARD -i $VM1_EXTERNAL_IF -o $VM1_INTERNAL_IF -j REJECT
+  - iptables-save > /etc/iptables/rules.v4
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+  - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable"
+  - apt update
+  - apt install docker-ce docker-compose -y
   - ip link add $VXLAN_IF type vxlan id $VID remote $VM2_INTERNAL_IP local $VM1_INTERNAL_IP dstport 4789
   - ip link set vxlan0 up
   - ip addr add $VM1_VXLAN_IP/24 dev vxlan0
